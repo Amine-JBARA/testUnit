@@ -4,7 +4,9 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        git 'file:///media/jbara/DD/MergingUnit/TI-SDK/sources/meta-curling/recipes-poc/Linux_SettingManager'
+              echo 'Pulling...';
+              git branch: 'main',
+              url : 'https://github.com/Amine-JBARA/testUnit.git';
       }
     }
     

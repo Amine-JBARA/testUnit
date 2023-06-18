@@ -1,0 +1,113 @@
+
+typedef struct {
+	uint8_t ready;
+} SV_CORE_MSG;
+
+int recv_msg(int fd, int len, char *reply_msg, int *reply_len)
+{
+	int ret = 0;
+
+	/* Note: len should be max length of response expected */
+	ret = read(fd, reply_msg, len);
+	if (ret < 0) {
+		perror("Can't read from rpmsg endpt device\n");
+		return -1;
+	} else {
+		*reply_len = ret;
+	}
+
+	return 0;
+}
+
+int send_msg(int fd, char *msg, int len)
+{
+	int ret = 0;
+
+	ret = write(fd, msg, len);
+	if (ret < 0) {
+		perror("Can't write to rpmsg endpt device\n");
+		return -1;
+	}
+
+	return ret;
+}
+
+/* single thread communicating with a single endpoint */
+int rproc_receive_samples(rpmsg_char_dev_t *rcdev, void * buffer, int * buffer_length)
+{
+	int ret = 0;
+	int i = 0;
+
+    ret = recv_msg(rcdev->fd, 256, (char *)buffer, buffer_length);
+    if (ret < 0) {
+        printf("recv_msg failed for iteration %d, ret = %d\n", i, ret);
+        goto out;
+    }
+    /* TODO: Verify data integrity */
+
+    /* TODO: Reduce number of prints */
+    //printf("Got message with length: %d\n", *buffer_length);
+	
+
+out:
+	return ret;
+}
+
+void *thread_rproc_management(void *arg) {
+
+    rpmsg_char_dev_t *rcdev;
+	int ret;
+	int rproc_id = 2;
+	int remote_endpt = REMOTE_ENDPT;
+	char *dev_name = NULL;
+	int flags = 0;
+	char eptdev_name[32] = { 0 };
+	int packet_len = 0;
+	char packet_buf[512] = { 0 };
+	char EthernetInterfaceName[] = IF_NAME;
+	SV_CORE_MSG R5_msg;
+
+
+	printf("Start thread for reveice rproc messages\n");
+
+    // Init of rproc
+	rcdev = rpmsg_char_open(rproc_id, dev_name, remote_endpt,
+				eptdev_name, flags);
+        if (!rcdev) {
+		perror("Can't create an endpoint device");
+		pthread_exit(NULL);
+        }
+		
+    printf("Created endpt device %s, fd = %d port = %d\n", eptdev_name,
+		rcdev->fd, rcdev->endpt);
+
+	/* Open socket */
+	ret = socket_init( EthernetInterfaceName );
+	if (ret) {
+		printf("socket_init failed, ret = %d\n", ret);
+		pthread_exit(NULL);
+	}
+	printf("socket_init done\n");
+
+	// Send ready and configuration to R5
+	R5_msg.ready = true;
+	ret = send_msg(rcdev->fd, (char *) &R5_msg, sizeof(R5_msg));
+	if (ret < 0) {
+		printf("send_msg failed ret = %d\n", ret);
+		pthread_exit(NULL);
+	}
+
+    // Run rproc receive messages
+    while (1)
+    {
+        ret = rproc_receive_samples(rcdev, packet_buf, &packet_len);
+
+		if ( ret == 0)
+			send_packet(packet_buf, packet_len);
+    }
+
+    rpmsg_char_exit();
+
+	// Arrêt propre du thread
+	pthread_exit(NULL);
+}

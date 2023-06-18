@@ -1,0 +1,81 @@
+#include <chrono>
+#include <iostream>
+#include <fstream>
+//#include <libconfig.h++>
+#include <thread>
+
+#include "command-line-parser.hpp"
+#include "daemon.hpp"
+#include "log.hpp"
+#include "ipc.hpp"
+
+// This function will be called when the daemon receive a SIGHUP signal.
+void reload() {
+    LOG_INFO("Reload function called.");
+
+    // Load configuration file
+    std::ifstream myfile;
+
+    myfile.open("./settings/MU_settings.cfg");
+
+
+    std::string mystring;
+    std::string myline;
+ 
+    if ( myfile.is_open() ) { // always check whether the file is open
+      while ( myfile ) {
+	std::getline (myfile, myline);
+	std::cout << myline << ": " << myfile.tellg() << '\n';
+      } 
+    }
+}
+
+int main(int argc, char** argv) {
+    // Command line and config file example
+    CommandLineParser commandLine(argc, argv);
+    /*
+    if (commandLine.cmdOptionExist("--config")) {
+        const std::string configFileName = commandLine.getCmdOptionValue("--config");
+        LOG_INFO("Config file name = ", configFileName);
+        libconfig::Config config;
+        config.readFile(configFileName.c_str());
+        std::string test{};
+        config.lookupValue("test", test);
+        LOG_INFO("Config option test = ", test);
+    }
+    */
+    // The Daemon class is a singleton to avoid be instantiate more than once
+    Daemon& daemon = Daemon::instance();
+
+    // Set the reload function to be called in case of receiving a SIGHUP signal
+    daemon.setReloadFunction(reload);
+
+
+    /**
+       Create thread for IPC communication
+     */
+    int ret;
+    pthread_t thread_rpoc;
+
+    /* Use auto-detection for SoC */
+    ret = rpmsg_char_init(NULL);
+    if (ret) {
+      printf("rpmsg_char_init failed, ret = %d\n", ret);
+      return EXIT_FAILURE;
+    }
+    printf("rpmsg_char_init done\n");
+    
+    pthread_create(&thread_rpoc, NULL, thread_rproc_management, NULL);
+
+    pthread_join(thread_rpoc, NULL);
+
+    
+    // Daemon main loop
+    int count = 0;
+    while (daemon.IsRunning()) {
+        LOG_DEBUG("Count: ", count++);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    LOG_INFO("The daemon process ended gracefully.");
+}

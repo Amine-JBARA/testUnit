@@ -1,0 +1,28 @@
+DESCRIPTION = "A friendly program that prints Hello World!"
+
+SECTION = "examples"
+LICENSE = "MIT"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+SRC_URI = "file://main.c \
+            file://ipc.c \
+            file://daemon.c \
+	    file://mu_config.cfg \
+            file://Makefile"
+S = "${WORKDIR}"
+
+DEPENDS = "ti-rpmsg-char"
+RDEPENDS_${PN} += "bash"
+
+do_compile() {
+    #${CC} ${CFLAGS} ${LDFLAGS}  main.c daemon.c ipc.c -o mu_settingmanager
+    oe_runmake -f Makefile all
+}
+
+do_install() {
+    install -d ${D}${bindir}
+    install -d ${D}${ROOT_HOME}
+    install -m 0755  mu_settingmanager ${D}${bindir}
+    install -m 0666 mu_config.cfg ${D}${ROOT_HOME}
+}
+
+FILES_${PN} += "${ROOT_HOME}/*"

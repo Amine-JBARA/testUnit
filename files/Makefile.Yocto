@@ -1,0 +1,27 @@
+# Makefile template for shared library
+
+#Yocto will pass in the CC flag so this is commented out.  Otherwise the correct compiler won't be used
+CC ?= gcc # C compiler
+
+#These are here to allow a build outside of Yocto (testing the build).  Yocto's CFLAGS
+#and LDFLAGS will override these.
+CFLAGS += -Wall -Wextra -O2 -g -DTARGET_ARM # C flags
+
+RM = rm -f  # rm command
+
+SRCS = main.cpp daemon.cpp ipc.cpp sqlite_interface.cpp
+
+TARGET_EXE = SettingManagerDaemon_arm
+
+OBJS = $(SRCS:.c=.o)
+
+.PHONY: all
+all: ${TARGET_EXE}
+
+$(TARGET_EXE): $(OBJS)
+	$(CC) ${CFLAGS} ${LDFLAGS}  -o $@ $^ -lstdc++ -lpthread -lti_rpmsg_char -lsqlite3 -lm
+
+.PHONY: clean
+
+clean:
+	-${RM} ${OBJS} $(TARGET_EXE)
